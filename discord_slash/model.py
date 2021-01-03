@@ -68,9 +68,10 @@ class SlashContext:
         await self._http.post(base, self._discord.user.id, self.interaction_id, self.__token, True)
         self.sent = True
 
-    def ack(self, eat: bool = False):
+    @property
+    def ack(self):
         """Alias of :meth:`.respond`."""
-        return self.respond(eat)
+        return self.respond
 
     async def send(self,
                    content: str = "",
@@ -105,7 +106,7 @@ class SlashContext:
         :return: ``None``
         """
         raise NotImplementedError
-        
+
         if not self.sent:
             await self.respond()
 
