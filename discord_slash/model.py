@@ -56,56 +56,72 @@ class SlashContext:
             # Should be set after every others are set.
             self.guild = int(_json["guild_id"])
 
+    async def respond(self, eat: bool = False):
+        """
+        Sends command invoke response.\n
+        You should call this first.
+
+        :param eat: Whether to eat user's input. Default ``False``
+        :return: None
+        """
+        base = {"type": 2 if eat else 5}
+        await self._http.post(base, self._discord.user.id, self.interaction_id, self.__token, True)
+        self.sent = True
+
+    def ack(self, eat: bool = False):
+        """Alias of :meth:`.respond`."""
+        return self.respond(eat)
+
     async def send(self,
-                   send_type: int = 4,
                    content: str = "",
                    *,
+                   wait: bool = True,
+                   embed: discord.Embed = None,
                    embeds: typing.List[discord.Embed] = None,
                    tts: bool = False,
                    allowed_mentions: discord.AllowedMentions = None,
-                   hidden: bool = False,
-                   complete_hidden: bool = False):
+                   hidden: bool = False):
         """
         Sends response of the slash command.
 
-        .. note::
-            Every args except `send_type` and `content` must be passed as keyword args.
-
         .. warning::
-            Param ``hidden`` only works without embeds.
+            - You cannot use both ``embed`` and ``embeds``.
+            - Param ``hidden`` only works without embeds.
 
-        :param send_type: Type of the response. Refer Discord API DOCS for more info about types. Default ``4``.
-        :type send_type: int
-        :param content: Content of the response. Can be ``None``.
+        :param content: Content of the response. Default empty string.
         :type content: str
-        :param embeds: Embeds of the response. Maximum 10, can be empty.
+        :param wait: Whether to wait. If you want to get :class:`discord.Message`, this should be set as ``True``. Default ``True``.
+        ;type wait: bool
+        :param embed: Embed of the response.
+        :type embed: discord.Embed
+        :param embeds: Multiple embeds of the response. Maximum 10, can be empty.
         :type embeds: List[discord.Embed]
         :param tts: Whether to speak message using tts. Default ``False``.
         :type tts: bool
-        :param allowed_mentions: AllowedMentions of the message.
+        :param allowed_mentions: AllowedMentions of the message. Default your discord client's setting.
         :type allowed_mentions: discord.AllowedMentions
         :param hidden: Whether the message is hidden, which means message content will only be seen to the author.
         :type hidden: bool
-        :param complete_hidden: If this is ``True``, it will be both hidden and `send_type` will be 3. Default ``False``.
-        :type complete_hidden: bool
         :return: ``None``
         """
+        raise NotImplementedError
+        
+        if not self.sent:
+            await self.respond()
+
+        if embed and embeds:
+            raise error.IncorrectFormat("You cannot use both `embed` and `embeds` at the same time!")
+
+        if embed:
+            embeds = [embed]
+
         if embeds and len(embeds) > 10:
-            raise error.IncorrectFormat("Embed must be 10 or fewer.")
-        if complete_hidden:
-            # Overrides both `hidden` and `send_type`.
-            hidden = True
-            send_type = 3
+            raise error.IncorrectFormat("Embeds must be 10 or fewer.")
+
+        if hidden and embeds:
+            self.logger.warning("You cannot use both `hidden` and `embeds` at the same time!")
+
         base = {
-            "type": send_type,
-            "data": {
-                "tts": tts,
-                "content": content,
-                "embeds": [x.to_dict() for x in embeds] if embeds else [],
-                "allowed_mentions": allowed_mentions.to_dict() if allowed_mentions
-                else self._discord.allowed_mentions.to_dict() if self._discord.allowed_mentions else {}
-            }
-        } if not self.sent else {
             "content": content,
             "tts": tts,
             "embeds": [x.to_dict() for x in embeds] if embeds else [],
@@ -113,18 +129,9 @@ class SlashContext:
             else self._discord.allowed_mentions.to_dict() if self._discord.allowed_mentions else {}
         }
         if hidden:
-            if self.sent:
-                base["flags"] = 64
-            else:
-                base["data"]["flags"] = 64
-        if hidden and embeds:
-            self.logger.warning("You cannot use both `hidden` and `embeds` at the same time!")
-        if (send_type == 2 or send_type == 5) and not self.sent:
-            base = {"type": send_type}
-        initial = True if not self.sent else False
-        resp = await self._http.post(base, self._discord.user.id, self.interaction_id, self.__token, initial)
-        self.sent = True
-        return resp
+            base["data"]["flags"] = 64
+        resp = await self._http.post(base, self._discord.user.id, self.interaction_id, self.__token, False)
+        return discord.Message()
 
     async def edit(self,
                    *,
