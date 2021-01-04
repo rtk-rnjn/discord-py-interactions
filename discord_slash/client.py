@@ -87,7 +87,7 @@ class SlashCommand:
                 self.commands[x.name] = x
             else:
                 if x.base in self.commands.keys():
-                    self.commands[x.base].allowed_guild_ids += x.allowed_guild_ids
+                    self.commands[x.base].allowed_guild_ids += [y for y in x.allowed_guild_ids if y not in self.commands[x.base].allowed_guild_ids]
                     self.commands[x.base].has_subcommands = True
                 else:
                     _cmd = {
@@ -304,7 +304,7 @@ class SlashCommand:
             "func": cmd,
             "description": description if description else "No description.",
             "auto_convert": auto_convert,
-            "guild_ids": guild_ids,
+            "guild_ids": list(set(guild_ids)),
             "api_options": options if options else [],
             "has_subcommands": has_subcommands
         }
@@ -372,7 +372,7 @@ class SlashCommand:
             self.commands[base] = model.CommandObject(base, _cmd)
         else:
             self.commands[base].has_subcommands = True
-            self.commands[base].allowed_guild_ids += guild_ids
+            self.commands[base].allowed_guild_ids += [x for x in guild_ids if x not in self.commands[base].allowed_guild_ids]
         if base not in self.subcommands.keys():
             self.subcommands[base] = {}
         if subcommand_group:
