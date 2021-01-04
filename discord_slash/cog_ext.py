@@ -55,7 +55,7 @@ def cog_slash(*,
             "func": cmd,
             "description": description if description else "No description.",
             "auto_convert": auto_convert,
-            "guild_ids": guild_ids,
+            "guild_ids": guild_ids if guild_ids else [],
             "api_options": options if options else [],
             "has_subcommands": False
         }
@@ -139,7 +139,7 @@ def cog_subcommand(*,
             "base_desc": base_description if base_description else "No Description.",
             "sub_group_desc": subcommand_group_description if subcommand_group_description else "No Description.",
             "auto_convert": auto_convert,
-            "guild_ids": guild_ids,
+            "guild_ids": guild_ids if guild_ids else [],
             "api_options": options if options else []
         }
         return CogSubcommandObject(_sub, base, cmd.__name__ if not name else name, subcommand_group)
