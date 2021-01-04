@@ -195,7 +195,7 @@ class SlashCommand:
                                 base_dict["description"] = sub_sub.subcommand_group_description
                         options.append(base_dict)
                 if selected.allowed_guild_ids:
-                    for y in selected.allowed_guild_ids:
+                    for y in set(selected.allowed_guild_ids):
                         await manage_commands.add_slash_command(self._discord.user.id,
                                                                 self._discord.http.token,
                                                                 y,
@@ -211,7 +211,7 @@ class SlashCommand:
                                                             options)
                 continue
             if selected.allowed_guild_ids:
-                for y in selected.allowed_guild_ids:
+                for y in set(selected.allowed_guild_ids):
                     await manage_commands.add_slash_command(self._discord.user.id,
                                                             self._discord.http.token,
                                                             y,
