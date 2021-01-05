@@ -7,3 +7,6 @@ docs/_build
 slash.log
 test
 __*.py
+dist
+build
+discord_py_slash_command.egg-info
