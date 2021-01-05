@@ -1,3 +1,10 @@
+# NOTE
+This branch is for quickly fixing unexpected and critical bugs in 1.0.8.X,
+since release 1.0.9, which includes SlashContext rewrite, will be a lot delayed.  
+Releases from this branch will NOT be published to GitHub repo's Releases page.  
+This branch will NOT be merged to `master` branch, since fixes aren't prefect
+and new fixes will be applied instead.
+
 # discord-py-slash-command
 Simple Discord Slash Commands extension for [discord.py](https://github.com/Rapptz/discord.py).
 
