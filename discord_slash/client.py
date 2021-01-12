@@ -102,7 +102,7 @@ class SlashCommand:
                 if x.base not in self.subcommands.keys():
                     self.subcommands[x.base] = {}
                 if x.subcommand_group:
-                    if x.subcommand_group not in self.subcommands:
+                    if x.subcommand_group not in self.subcommands[x.base]:
                         self.subcommands[x.base][x.subcommand_group] = {}
                     if x.name in self.subcommands[x.base][x.subcommand_group].keys():
                         raise error.DuplicateCommand(f"{x.base} {x.subcommand_group} {x.name}")
