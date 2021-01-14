@@ -1,4 +1,6 @@
 # NOTE
+UPDATE: We just switched the default branch to this.  
+
 This branch is for quickly fixing unexpected and critical bugs in 1.0.8.X,
 since release 1.0.9, which includes SlashContext rewrite, will be a lot delayed.  
 Releases from this branch will NOT be published to GitHub repo's Releases page.  
