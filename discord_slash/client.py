@@ -38,7 +38,6 @@ class SlashCommand:
     :ivar logger: Logger of this client.
     :ivar sync_commands: Whether to sync commands automatically.
     :ivar sync_on_cog_reload: Whether to sync commands on cog reload.
-    :ivar has_listener: Whether discord client has listener add function.
     """
 
     def __init__(
@@ -57,28 +56,22 @@ class SlashCommand:
         self.req = http.SlashCommandRequest(self.logger, self._discord, application_id)
         self.sync_commands = sync_commands
         self.sync_on_cog_reload = sync_on_cog_reload
+        self.is_bot = False
 
         if self.sync_commands:
             self._discord.loop.create_task(self.sync_all_commands(delete_from_unused_guilds))
 
+        self._inject_parsers()
         if (
-            not isinstance(client, commands.Bot)
-            and not isinstance(client, commands.AutoShardedBot)
-            and not override_type
+            isinstance(client, commands.Bot)
+            or isinstance(client, commands.AutoShardedBot)
         ):
-            self.logger.warning(
-                "Detected discord.Client! It is highly recommended to use `commands.Bot`. Do not add any `on_socket_response` event."
-            )
-            self._discord.on_socket_response = self.on_socket_response
-            self.has_listener = False
-        else:
             if not hasattr(self._discord, "slash"):
                 self._discord.slash = self
             else:
                 raise error.DuplicateSlashClient("You can't have duplicate SlashCommand instances!")
 
-            self._discord.add_listener(self.on_socket_response)
-            self.has_listener = True
+            self.is_bot = True
             default_add_function = self._discord.add_cog
 
             def override_add_cog(cog: commands.Cog):
@@ -107,6 +100,38 @@ class SlashCommand:
                     )
 
                 self._discord.reload_extension = override_reload_extension
+
+    def _inject_parsers(self):
+        parsers = {
+            "INTERACTION_CREATE": self._parse_interaction_create,
+            "APPLICATION_COMMAND_CREATE": self._parse_application_command_create,
+            "APPLICATION_COMMAND_DELETE": self._parse_application_command_delete,
+            "APPLICATION_COMMAND_UPDATE": self._parse_application_command_update
+        }
+        self._discord._connection.parsers.update(parsers)
+        self._discord.on_raw_interaction_create = self.process_commands
+
+    def _parse_interaction_create(self, data):
+        self._discord.dispatch("raw_interaction_create", data)
+        interaction_type = int(data['type'])
+        if interaction_type == model.InteractionType.ApplicationCommand:
+            ctx = context.SlashContext(self.req, data, self._discord, self.logger)
+            self._discord.dispatch("slash_command", ctx)
+        elif interaction_type == model.InteractionType.Component:
+            ctx = context.ComponentContext(self.req, data, self._discord, self.logger)
+            self._discord.dispatch("component", ctx)
+
+    def _parse_application_command_create(self, data):
+        command = model.CommandData(**data)
+        self._discord.dispatch("application_command_create", command)
+
+    def _parse_application_command_update(self, data):
+        command = model.CommandData(**data)
+        self._discord.dispatch("application_command_update", command)
+
+    def _parse_application_command_delete(self, data):
+        command = model.CommandData(**data)
+        self._discord.dispatch("application_command_delete", command)
 
     def get_cog_commands(self, cog: commands.Cog):
         """
@@ -959,7 +984,7 @@ class SlashCommand:
                         self.logger.error(f"{ctx.command}:: Error using error decorator: {e}")
             await self.on_slash_command_error(ctx, ex)
 
-    async def on_socket_response(self, msg):
+    async def process_commands(self, data):
         """
         This event listener is automatically registered at initialization of this class.
 
@@ -968,32 +993,19 @@ class SlashCommand:
 
         :param msg: Gateway message.
         """
-        if msg["t"] != "INTERACTION_CREATE":
+        
+        interaction_type = data["type"]
+        if interaction_type != model.InteractionType.ApplicationCommand:
             return
+        if data["data"]["name"] in self.commands:
 
-        to_use = msg["d"]
-        interaction_type = to_use["type"]
-        if interaction_type in (1, 2):
-            return await self._on_slash(to_use)
-        if interaction_type == 3:
-            return await self._on_component(to_use)
-
-        raise NotImplementedError
-
-    async def _on_component(self, to_use):
-        ctx = context.ComponentContext(self.req, to_use, self._discord, self.logger)
-        self._discord.dispatch("component", ctx)
-
-    async def _on_slash(self, to_use):
-        if to_use["data"]["name"] in self.commands:
-
-            ctx = context.SlashContext(self.req, to_use, self._discord, self.logger)
-            cmd_name = to_use["data"]["name"]
+            ctx = context.SlashContext(self.req, data, self._discord, self.logger)
+            cmd_name = data["data"]["name"]
 
             if cmd_name not in self.commands and cmd_name in self.subcommands:
-                return await self.handle_subcommand(ctx, to_use)
+                return await self.handle_subcommand(ctx, data)
 
-            selected_cmd = self.commands[to_use["data"]["name"]]
+            selected_cmd = self.commands[data["data"]["name"]]
 
             if (
                 selected_cmd.allowed_guild_ids
@@ -1002,12 +1014,12 @@ class SlashCommand:
                 return
 
             if selected_cmd.has_subcommands and not selected_cmd.func:
-                return await self.handle_subcommand(ctx, to_use)
+                return await self.handle_subcommand(ctx, data)
 
-            if "options" in to_use["data"]:
-                for x in to_use["data"]["options"]:
+            if "options" in data["data"]:
+                for x in data["data"]["options"]:
                     if "value" not in x:
-                        return await self.handle_subcommand(ctx, to_use)
+                        return await self.handle_subcommand(ctx, data)
 
             # This is to temporarily fix Issue #97, that on Android device
             # does not give option type from API.
@@ -1018,15 +1030,13 @@ class SlashCommand:
             args = (
                 await self.process_options(
                     ctx.guild,
-                    to_use["data"]["options"],
+                    data["data"]["options"],
                     selected_cmd.connector,
                     temporary_auto_convert,
                 )
-                if "options" in to_use["data"]
+                if "options" in data["data"]
                 else {}
             )
-
-            self._discord.dispatch("slash_command", ctx)
 
             await self.invoke_command(selected_cmd, ctx, args)
 
@@ -1070,7 +1080,6 @@ class SlashCommand:
                     if "options" in x
                     else {}
                 )
-                self._discord.dispatch("slash_command", ctx)
                 await self.invoke_command(selected, ctx, args)
                 return
         selected = base[sub_name]
@@ -1088,7 +1097,6 @@ class SlashCommand:
             if "options" in sub
             else {}
         )
-        self._discord.dispatch("slash_command", ctx)
         await self.invoke_command(selected, ctx, args)
 
     async def on_slash_command_error(self, ctx, ex):
@@ -1117,7 +1125,7 @@ class SlashCommand:
         :type ex: Exception
         :return:
         """
-        if self.has_listener:
+        if self.is_bot:
             if self._discord.extra_events.get("on_slash_command_error"):
                 self._discord.dispatch("slash_command_error", ctx, ex)
                 return

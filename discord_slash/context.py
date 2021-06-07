@@ -40,8 +40,9 @@ class InteractionContext:
         logger,
     ):
         self._token = _json["token"]
+        self.type = model.InteractionType(int(_json["type"]))
         self.message = None  # Should be set later.
-        self.interaction_id = _json["id"]
+        self.interaction_id = int(_json["id"])
         self._http = _http
         self.bot = _discord
         self._logger = logger

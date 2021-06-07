@@ -3,9 +3,11 @@ import datetime
 from contextlib import suppress
 from enum import IntEnum
 from inspect import iscoroutinefunction
+from typing import Any, Dict, Optional, Union
 
 import discord
 from discord.ext.commands import CommandOnCooldown, CooldownMapping
+from discord.state import ConnectionState
 
 from . import error, http
 from .dpy_overrides import ComponentMessage
@@ -76,6 +78,7 @@ class CommandData:
     :ivar options: List of :class:`OptionData`.
     :ivar id: Command id, this is received from discord so may not be present
     :ivar application_id: The application id of the bot, required only when the application id and bot id are different. (old bots)
+    :ivar guild_id: The id of the guild the command is in (if applicable) this only is received on the gateway command events (update, create, delete).
     """
 
     def __init__(
@@ -87,6 +90,7 @@ class CommandData:
         id=None,
         application_id=None,
         version=None,
+        guild_id=None,
         **kwargs
     ):
         self.name = name
@@ -94,6 +98,7 @@ class CommandData:
         self.default_permission = default_permission
         self.id = id
         self.application_id = application_id
+        self.guild_id = guild_id
         self.version = version
         if options is not None:
             self.options = []
@@ -556,3 +561,9 @@ class SlashCommandPermissionType(IntEnum):
             return cls.ROLE
         if issubclass(t, discord.abc.User):
             return cls.USER
+
+
+class InteractionType(IntEnum):
+    Ping = 1
+    ApplicationCommand = 2
+    Component = 3
