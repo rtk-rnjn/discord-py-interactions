@@ -1,6 +1,6 @@
 <p align="center">
     <br>
-    <a href="https://pypi.org/project/discord-interactions/"><img src="https://raw.githubusercontent.com/discord-py-slash-commands/discord-py-slash-command/master/.github/discordpyinteractionslogo.png" alt="discord-interactions" height="128"></a>
+    <a href="https://pypi.org/project/discord-interactions/"><img src="https://raw.githubusercontent.com/discord-py-slash-commands/discord-py-slash-command/goverfl0w-rewrite-base/.github/discordpyinteractionslogo.png" alt="discord-interactions" height="128"></a>
     <h2 align = "center">A simple discord interaction handler for <a href="https://github.com/Rapptz/discord.py">discord.py</a></h2>
 </p>
 <p align="center">
