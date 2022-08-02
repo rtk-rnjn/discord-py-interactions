@@ -97,7 +97,7 @@ class SlashCommandRequest:
         :param \**kwargs: Kwargs to pass into discord.py's `request function <https://github.com/Rapptz/discord.py/blob/master/discord/http.py#L134>`_
         """
         url = f"/applications/{self.application_id}"
-        url += "/commands" if not guild_id else f"/guilds/{guild_id}/commands"
+        url += f"/guilds/{guild_id}/commands" if guild_id else "/commands"
         url += url_ending
         route = CustomRoute(method, url)
         return self._discord.http.request(route, **kwargs)

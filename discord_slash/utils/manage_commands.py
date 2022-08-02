@@ -26,7 +26,7 @@ async def add_slash_command(
     :raises: :class:`.error.RequestFailure` - Requesting to Discord API has failed.
     """
     url = f"https://discord.com/api/v8/applications/{bot_id}"
-    url += "/commands" if not guild_id else f"/guilds/{guild_id}/commands"
+    url += f"/guilds/{guild_id}/commands" if guild_id else "/commands"
     base = {"name": cmd_name, "description": description, "options": options or []}
 
     async with aiohttp.ClientSession() as session:
@@ -56,7 +56,7 @@ async def remove_slash_command(bot_id, bot_token, guild_id, cmd_id):
     :raises: :class:`.error.RequestFailure` - Requesting to Discord API has failed.
     """
     url = f"https://discord.com/api/v8/applications/{bot_id}"
-    url += "/commands" if not guild_id else f"/guilds/{guild_id}/commands"
+    url += f"/guilds/{guild_id}/commands" if guild_id else "/commands"
     url += f"/{cmd_id}"
     async with aiohttp.ClientSession() as session:
         async with session.delete(url, headers={"Authorization": f"Bot {bot_token}"}) as resp:
@@ -80,7 +80,7 @@ async def get_all_commands(bot_id, bot_token, guild_id=None):
     :raises: :class:`.error.RequestFailure` - Requesting to Discord API has failed.
     """
     url = f"https://discord.com/api/v8/applications/{bot_id}"
-    url += "/commands" if not guild_id else f"/guilds/{guild_id}/commands"
+    url += f"/guilds/{guild_id}/commands" if guild_id else "/commands"
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers={"Authorization": f"Bot {bot_token}"}) as resp:
             if resp.status == 429:
@@ -303,16 +303,14 @@ def generate_options(
         if param.default is not inspect._empty:
             required = False
         elif getattr(param.annotation, "__origin__", None) is typing.Union:
-            # Make a command argument optional with typing.Optional[type] or typing.Union[type, None]
-            args = getattr(param.annotation, "__args__", None)
-            if args:
+            if args := getattr(param.annotation, "__args__", None):
                 param = param.replace(annotation=args[0])
                 required = not isinstance(args[-1], type(None))
 
         option_type = (
             SlashCommandOptionType.from_type(param.annotation) or SlashCommandOptionType.STRING
         )
-        name = param.name if not connector else connector[param.name]
+        name = connector[param.name] if connector else param.name
         options.append(create_option(name, description or "No Description.", option_type, required))
 
     return options
@@ -343,9 +341,7 @@ def create_permission(
     .. note::
         For @everyone permission, set id_type as role and id as guild id.
     """
-    if not (
-        isinstance(id_type, int) or isinstance(id_type, bool)
-    ):  # Bool values are a subclass of int
+    if not isinstance(id_type, (int, bool)):  # Bool values are a subclass of int
         original_type = id_type
         id_type = SlashCommandPermissionType.from_type(original_type)
         if id_type is None:

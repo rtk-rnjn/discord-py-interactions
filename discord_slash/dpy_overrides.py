@@ -51,8 +51,6 @@ def send_files(
     message_reference=None
 ):
     r = Route("POST", "/channels/{channel_id}/messages", channel_id=channel_id)
-    form = []
-
     payload = {"tts": tts}
     if content:
         payload["content"] = content
@@ -67,7 +65,7 @@ def send_files(
     if message_reference:
         payload["message_reference"] = message_reference
 
-    form.append({"name": "payload_json", "value": utils.to_json(payload)})
+    form = [{"name": "payload_json", "value": utils.to_json(payload)}]
     if len(files) == 1:
         file = files[0]
         form.append(
@@ -79,15 +77,15 @@ def send_files(
             }
         )
     else:
-        for index, file in enumerate(files):
-            form.append(
-                {
-                    "name": "file%s" % index,
-                    "value": file.fp,
-                    "filename": file.filename,
-                    "content_type": "application/octet-stream",
-                }
-            )
+        form.extend(
+            {
+                "name": f"file{index}",
+                "value": file.fp,
+                "filename": file.filename,
+                "content_type": "application/octet-stream",
+            }
+            for index, file in enumerate(files)
+        )
 
     return self.request(r, form=form, files=files)
 
@@ -233,14 +231,13 @@ async def send(
     if embed is not None:
         embed = embed.to_dict()
 
-    if allowed_mentions is not None:
-        if state.allowed_mentions is not None:
-            allowed_mentions = state.allowed_mentions.merge(allowed_mentions).to_dict()
-        else:
-            allowed_mentions = allowed_mentions.to_dict()
-    else:
+    if allowed_mentions is None:
         allowed_mentions = state.allowed_mentions and state.allowed_mentions.to_dict()
 
+    elif state.allowed_mentions is not None:
+        allowed_mentions = state.allowed_mentions.merge(allowed_mentions).to_dict()
+    else:
+        allowed_mentions = allowed_mentions.to_dict()
     if mention_author is not None:
         allowed_mentions = allowed_mentions or AllowedMentions().to_dict()
         allowed_mentions["replied_user"] = bool(mention_author)

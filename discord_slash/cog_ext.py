@@ -137,7 +137,7 @@ def cog_subcommand(
     """
     base_description = base_description or base_desc
     subcommand_group_description = subcommand_group_description or sub_group_desc
-    guild_ids = guild_ids if guild_ids else []
+    guild_ids = guild_ids or []
 
     def wrapper(cmd):
         desc = description or inspect.getdoc(cmd)

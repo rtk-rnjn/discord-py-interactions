@@ -86,7 +86,7 @@ def emoji_to_dict(emoji: typing.Union[discord.Emoji, discord.PartialEmoji, str])
         emoji = emoji.to_dict()
     elif isinstance(emoji, str):
         emoji = {"name": emoji, "id": None}
-    return emoji if emoji else {}
+    return emoji or {}
 
 
 def create_button(

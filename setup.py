@@ -10,7 +10,7 @@ HERE = path.abspath(path.dirname(__file__))
 with open("README.md", "r", encoding="UTF-8") as f:
     README = f.read()
 with open(path.join(HERE, PACKAGE_NAME, "const.py"), encoding="utf-8") as fp:
-    VERSION = re.search('__version__ = "([^"]+)"', fp.read()).group(1)
+    VERSION = re.search('__version__ = "([^"]+)"', fp.read())[1]
 
 extras = {
     "lint": ["black", "flake8", "isort"],

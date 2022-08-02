@@ -46,17 +46,14 @@ class OptionData:
             raise error.IncorrectCommandData("type is required for options")
         self.required = required
         if choices is not None:
-            self.choices = []
-            for choice in choices:
-                self.choices.append(ChoiceData(**choice))
+            self.choices = [ChoiceData(**choice) for choice in choices]
         else:
             self.choices = None
 
         if self.type in (1, 2):
             self.options = []
             if options is not None:
-                for option in options:
-                    self.options.append(OptionData(**option))
+                self.options.extend(OptionData(**option) for option in options)
             elif self.type == 2:
                 raise error.IncorrectCommandData(
                     "Options are required for subcommands / subcommand groups"
@@ -96,9 +93,7 @@ class CommandData:
         self.application_id = application_id
         self.version = version
         if options is not None:
-            self.options = []
-            for option in options:
-                self.options.append(OptionData(**option))
+            self.options = [OptionData(**option) for option in options]
         else:
             self.options = None
 
@@ -172,8 +167,7 @@ class CallbackObject:
             dt = ctx.created_at
             current = dt.replace(tzinfo=datetime.timezone.utc).timestamp()
             bucket = self._buckets.get_bucket(ctx, current)
-            retry_after = bucket.update_rate_limit(current)
-            if retry_after:
+            if retry_after := bucket.update_rate_limit(current):
                 raise CommandOnCooldown(bucket, retry_after)
 
     async def _concurrency_checks(self, ctx):
@@ -288,9 +282,10 @@ class CallbackObject:
         :return: bool
         """
         res = [
-            bool(x(ctx)) if not iscoroutinefunction(x) else bool(await x(ctx))
+            bool(await x(ctx)) if iscoroutinefunction(x) else bool(x(ctx))
             for x in self.__commands_checks__
         ]
+
         return False not in res
 
 
@@ -495,17 +490,14 @@ class SlashMessage(ComponentMessage):
         """
         _resp = {}
 
-        content = fields.get("content")
-        if content:
+        if content := fields.get("content"):
             _resp["content"] = str(content)
 
         embed = fields.get("embed")
         embeds = fields.get("embeds")
         file = fields.get("file")
         files = fields.get("files")
-        components = fields.get("components")
-
-        if components:
+        if components := fields.get("components"):
             _resp["components"] = components
 
         if embed and embeds:
@@ -534,8 +526,7 @@ class SlashMessage(ComponentMessage):
 
         await self._http.edit(_resp, self.__interaction_token, self.id, files=files)
 
-        delete_after = fields.get("delete_after")
-        if delete_after:
+        if delete_after := fields.get("delete_after"):
             await self.delete(delay=delete_after)
         if files:
             [x.close() for x in files]
@@ -605,8 +596,9 @@ class GuildPermissionsData:
         self.guild_id = guild_id
         self.permissions = []
         if permissions:
-            for permission in permissions:
-                self.permissions.append(PermissionData(**permission))
+            self.permissions.extend(
+                PermissionData(**permission) for permission in permissions
+            )
 
     def __eq__(self, other):
         if isinstance(other, GuildPermissionsData):

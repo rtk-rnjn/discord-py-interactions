@@ -160,8 +160,7 @@ class SlashCommand:
                         if i not in base_command.allowed_guild_ids:
                             base_command.allowed_guild_ids.append(i)
 
-                    base_permissions = x.base_command_data["api_permissions"]
-                    if base_permissions:
+                    if base_permissions := x.base_command_data["api_permissions"]:
                         for applicable_guild in base_permissions:
                             if applicable_guild not in base_command.permissions:
                                 base_command.permissions[applicable_guild] = []
@@ -181,9 +180,9 @@ class SlashCommand:
                     if x.name in self.subcommands[x.base][x.subcommand_group]:
                         raise error.DuplicateCommand(f"{x.base} {x.subcommand_group} {x.name}")
                     self.subcommands[x.base][x.subcommand_group][x.name] = x
+                elif x.name in self.subcommands[x.base]:
+                    raise error.DuplicateCommand(f"{x.base} {x.name}")
                 else:
-                    if x.name in self.subcommands[x.base]:
-                        raise error.DuplicateCommand(f"{x.base} {x.name}")
                     self.subcommands[x.base][x.name] = x
 
     def _get_cog_component_callbacks(self, cog, func_list):
@@ -376,15 +375,14 @@ class SlashCommand:
         for guild in cmds["guild"]:
             cmds_formatted[guild] = cmds["guild"][guild]
 
-        for scope in cmds_formatted:
+        for scope, new_cmds in cmds_formatted.items():
             permissions = {}
-            new_cmds = cmds_formatted[scope]
             existing_cmds = await self.req.get_all_commands(guild_id=scope)
-            existing_by_name = {}
             to_send = []
             changed = False
-            for cmd in existing_cmds:
-                existing_by_name[cmd["name"]] = model.CommandData(**cmd)
+            existing_by_name = {
+                cmd["name"]: model.CommandData(**cmd) for cmd in existing_cmds
+            }
 
             if len(new_cmds) != len(existing_cmds):
                 changed = True
@@ -418,12 +416,8 @@ class SlashCommand:
                     f"Detected no changes on {scope if scope is not None else 'global'}, skipping"
                 )
 
-            id_name_map = {}
-            for cmd in existing_cmds:
-                id_name_map[cmd["name"]] = cmd["id"]
-
-            for cmd_name in permissions:
-                cmd_permissions = permissions[cmd_name]
+            id_name_map = {cmd["name"]: cmd["id"] for cmd in existing_cmds}
+            for cmd_name, cmd_permissions in permissions.items():
                 cmd_id = id_name_map[cmd_name]
                 for applicable_guild in cmd_permissions:
                     if applicable_guild not in permissions_map:
@@ -437,19 +431,19 @@ class SlashCommand:
 
         self.logger.info("Syncing permissions...")
         self.logger.debug(f"Commands permission data are {permissions_map}")
-        for scope in permissions_map:
+        for scope, new_perms in permissions_map.items():
             existing_perms = await self.req.get_all_guild_commands_permissions(scope)
-            new_perms = permissions_map[scope]
-
             changed = False
             if len(existing_perms) != len(new_perms):
                 changed = True
             else:
-                existing_perms_model = {}
-                for existing_perm in existing_perms:
-                    existing_perms_model[existing_perm["id"]] = model.GuildPermissionsData(
+                existing_perms_model = {
+                    existing_perm["id"]: model.GuildPermissionsData(
                         **existing_perm
                     )
+                    for existing_perm in existing_perms
+                }
+
                 for new_perm in new_perms:
                     if new_perm["id"] not in existing_perms_model:
                         changed = True
@@ -535,7 +529,7 @@ class SlashCommand:
         """
         name = name or cmd.__name__
         name = name.lower()
-        guild_ids = guild_ids if guild_ids else []
+        guild_ids = guild_ids or []
         if not all(isinstance(item, int) for item in guild_ids):
             raise error.IncorrectGuildIDType(
                 f"The snowflake IDs {guild_ids} given are not a list of integers. Because of discord.py convention, please use integer IDs instead. Furthermore, the command '{name}' will be deactivated and broken until fixed."
@@ -617,7 +611,7 @@ class SlashCommand:
         name = name or cmd.__name__
         name = name.lower()
         description = description or getdoc(cmd)
-        guild_ids = guild_ids if guild_ids else []
+        guild_ids = guild_ids or []
         if not all(isinstance(item, int) for item in guild_ids):
             raise error.IncorrectGuildIDType(
                 f"The snowflake IDs {guild_ids} given are not a list of integers. Because of discord.py convention, please use integer IDs instead. Furthermore, the command '{name}' will be deactivated and broken until fixed."

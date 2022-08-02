@@ -48,10 +48,13 @@ class InteractionContext:
         self.deferred = False
         self.responded = False
         self._deferred_hidden = False  # To check if the patch to the deferred response matches
-        self.guild_id = int(_json["guild_id"]) if "guild_id" in _json.keys() else None
+        self.guild_id = int(_json["guild_id"]) if "guild_id" in _json else None
         self.author_id = int(
-            _json["member"]["user"]["id"] if "member" in _json.keys() else _json["user"]["id"]
+            _json["member"]["user"]["id"]
+            if "member" in _json
+            else _json["user"]["id"]
         )
+
         self.channel_id = int(_json["channel_id"])
         if self.guild:
             self.author = discord.Member(
@@ -183,7 +186,7 @@ class InteractionContext:
             files = [file]
         if delete_after and hidden:
             raise error.IncorrectFormat("You can't delete a hidden message!")
-        if components and not all(comp.get("type") == 1 for comp in components):
+        if components and any(comp.get("type") != 1 for comp in components):
             raise error.IncorrectFormat(
                 "The top level of the components list must be made of ActionRows!"
             )
@@ -218,31 +221,27 @@ class InteractionContext:
             else:
                 json_data = {"type": 4, "data": base}
                 await self._http.post_initial_response(json_data, self.interaction_id, self._token)
-                if not hidden:
-                    resp = await self._http.edit({}, self._token)
-                else:
-                    resp = {}
+                resp = {} if hidden else await self._http.edit({}, self._token)
             self.responded = True
         else:
             resp = await self._http.post_followup(base, self._token, files=files)
         if files:
             for file in files:
                 file.close()
-        if not hidden:
-            smsg = model.SlashMessage(
-                state=self.bot._connection,
-                data=resp,
-                channel=self.channel or discord.Object(id=self.channel_id),
-                _http=self._http,
-                interaction_token=self._token,
-            )
-            if delete_after:
-                self.bot.loop.create_task(smsg.delete(delay=delete_after))
-            if initial_message:
-                self.message = smsg
-            return smsg
-        else:
+        if hidden:
             return resp
+        smsg = model.SlashMessage(
+            state=self.bot._connection,
+            data=resp,
+            channel=self.channel or discord.Object(id=self.channel_id),
+            _http=self._http,
+            interaction_token=self._token,
+        )
+        if delete_after:
+            self.bot.loop.create_task(smsg.delete(delay=delete_after))
+        if initial_message:
+            self.message = smsg
+        return smsg
 
 
 class SlashContext(InteractionContext):
@@ -297,7 +296,10 @@ class ComponentContext(InteractionContext):
         self.component_type = _json["data"]["component_type"]
         super().__init__(_http=_http, _json=_json, _discord=_discord, logger=logger)
         self.origin_message = None
-        self.origin_message_id = int(_json["message"]["id"]) if "message" in _json.keys() else None
+        self.origin_message_id = (
+            int(_json["message"]["id"]) if "message" in _json else None
+        )
+
 
         self.component = None
 
@@ -373,17 +375,14 @@ class ComponentContext(InteractionContext):
         """
         _resp = {}
 
-        content = fields.get("content")
-        if content:
+        if content := fields.get("content"):
             _resp["content"] = str(content)
 
         embed = fields.get("embed")
         embeds = fields.get("embeds")
         file = fields.get("file")
         files = fields.get("files")
-        components = fields.get("components")
-
-        if components:
+        if components := fields.get("components"):
             _resp["components"] = components
 
         if embed and embeds:
@@ -410,26 +409,25 @@ class ComponentContext(InteractionContext):
             else {}
         )
 
-        if not self.responded:
-            if files and not self.deferred:
-                await self.defer(edit_origin=True)
-            if self.deferred:
-                if not self._deferred_edit_origin:
-                    self._logger.warning(
-                        "Deferred response might not be what you set it to! (edit origin / send response message) "
-                        "This is because it was deferred with different response type."
-                    )
-                _json = await self._http.edit(_resp, self._token, files=files)
-                self.deferred = False
-            else:  # noqa: F841
-                json_data = {"type": 7, "data": _resp}
-                _json = await self._http.post_initial_response(  # noqa: F841
-                    json_data, self.interaction_id, self._token
-                )
-            self.responded = True
-        else:
+        if self.responded:
             raise error.IncorrectFormat("Already responded")
 
+        if files and not self.deferred:
+            await self.defer(edit_origin=True)
+        if self.deferred:
+            if not self._deferred_edit_origin:
+                self._logger.warning(
+                    "Deferred response might not be what you set it to! (edit origin / send response message) "
+                    "This is because it was deferred with different response type."
+                )
+            _json = await self._http.edit(_resp, self._token, files=files)
+            self.deferred = False
+        else:  # noqa: F841
+            json_data = {"type": 7, "data": _resp}
+            _json = await self._http.post_initial_response(  # noqa: F841
+                json_data, self.interaction_id, self._token
+            )
+        self.responded = True
         if files:
             for file in files:
                 file.close()
